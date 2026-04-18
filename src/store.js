@@ -197,7 +197,11 @@ export function duplicateNode(id) {
   schedSave();
 }
 
-// ── EDGE ACTIONS ──────────────────────────────────────
+export function importDiagram(rfNodes, rfEdges) {
+  snapshot();
+  setState({ rfNodes, rfEdges });
+  schedSave();
+}
 export function addEdge(params, connType = 'ref') {
   const edge = { id: uid(), source: params.source, target: params.target, sourceHandle: params.sourceHandle, targetHandle: params.targetHandle, type: 'dbEdge', data: { connType, label: '', cardinality: '' } };
   snapshot();

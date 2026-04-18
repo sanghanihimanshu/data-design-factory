@@ -121,19 +121,20 @@ textarea { resize: vertical; }
   text-transform: uppercase;
   letter-spacing: 0.7px;
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
 .row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-.irow { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+.irow { display: flex; gap: 6px; align-items: flex-start; margin-bottom: 6px; }
+.irow > div { flex: 1; min-width: 0; }
 
 .addbtn {
   background: var(--field-bg);
   border: 1.5px dashed var(--border);
   color: var(--muted);
-  padding: 4px 12px;
+  padding: 4px 10px;
   border-radius: var(--radius);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   transition: all .15s;
   display: inline-flex;
@@ -164,25 +165,28 @@ textarea { resize: vertical; }
   background: var(--field-bg);
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px;
-  margin-bottom: 8px;
+  padding: 8px;
+  margin-bottom: 6px;
   transition: border-color .15s;
 }
 .field-row:focus-within { border-color: var(--brand-border); }
+.field-row .row:last-child,
+.field-row .cb-row:last-child { margin-bottom: 0; }
 
-.cb-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.cb-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
 .cb-lbl {
   display: flex;
-  gap: 5px;
+  gap: 4px;
   align-items: center;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 600;
   cursor: pointer;
   color: var(--muted);
   user-select: none;
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: 4px;
   transition: background .1s;
+  white-space: nowrap;
 }
 .cb-lbl:hover { background: transparent; }
 .cb-lbl input { width: auto; }

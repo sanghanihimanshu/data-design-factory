@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { X, Copy, CheckCheck, AlertTriangle, Info, CheckCircle2, Keyboard, LayoutTemplate, Upload } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { X, Copy, CheckCheck, AlertTriangle, Info, CheckCircle2, Keyboard, LayoutTemplate, Upload, Download } from 'lucide-react';
 import { DB } from '../constants';
-import { setState } from '../store';
+import { setState, importDiagram } from '../store';
 import { TEMPLATES, loadTemplate as loadTpl } from '../templates';
 
 // ── EXPORT ────────────────────────────────────────────
@@ -86,18 +86,85 @@ function genGo(nodes) {
   }).join('\n\n');
 }
 
+function genAI(nodes) {
+  if (!nodes.length) return '// No nodes in diagram\n';
+  const DB_LABELS = { sql:'SQL Table', document:'MongoDB Collection', graph:'Graph DB', cache:'Cache', objstore:'Object Storage', search:'Search Index', tseries:'Time Series', vector:'Vector DB', column:'Column Store', queue:'Queue/Stream', keyvalue:'Key-Value', ledger:'Ledger' };
+  const lines = ['# Database Schema — AI Context', '', `Total nodes: ${nodes.length}`, ''];
+  nodes.forEach(n => {
+    const s = n.data.schema, t = n.data.dbType;
+    lines.push(`## ${n.data.name} [${DB_LABELS[t] || t}]`);
+    if (s.engine) lines.push(`Engine: ${s.engine}`);
+    if (t === 'document') {
+      lines.push(`Collection: ${s.collection || n.data.name}`);
+      lines.push('Fields:');
+      (s.fields || []).forEach(f => {
+        const flags = [f.required && 'required', f.unique && 'unique', f.indexed && `index(${f.indexType||'1'})`, f.sparse && 'sparse'].filter(Boolean);
+        lines.push(`  - ${f.name}: ${f.type}${flags.length ? ` [${flags.join(', ')}]` : ''}${f.default ? ` default=${f.default}` : ''}${f.enumValues ? ` enum(${f.enumValues})` : ''}`);
+        if (f.subFields?.length) {
+          const printSub = (subs, indent) => subs.forEach(sf => {
+            const sf_flags = [sf.required && 'required', sf.unique && 'unique', sf.index && 'index'].filter(Boolean);
+            lines.push(`${indent}- ${sf.name}: ${sf.type}${sf_flags.length ? ` [${sf_flags.join(', ')}]` : ''}`);
+            if (sf.subFields?.length) printSub(sf.subFields, indent + '  ');
+          });
+          printSub(f.subFields, '      ');
+        }
+      });
+    } else if (t === 'sql') {
+      lines.push('Columns:');
+      (s.columns || []).forEach(c => {
+        const flags = [c.pk && 'PK', !c.nullable && 'NOT NULL', c.unique && 'UNIQUE', c.index && 'INDEX', c.fk && `FK→${c.fk}`].filter(Boolean);
+        lines.push(`  - ${c.name}: ${c.type}${flags.length ? ` [${flags.join(', ')}]` : ''}${c.default ? ` default=${c.default}` : ''}`);
+      });
+    } else if (t === 'graph') {
+      lines.push(`Entity: ${s.entityType}, Labels: ${(s.labels||[]).join(', ')}`);
+      lines.push('Properties:');
+      (s.properties || []).forEach(p => lines.push(`  - ${p.name}: ${p.type}${p.required ? ' [required]' : ''}${p.indexed ? ' [index]' : ''}`));
+    } else if (t === 'cache') {
+      lines.push(`Key Pattern: ${s.keyPattern}, Structure: ${s.structure}, TTL: ${s.ttl}s`);
+      (s.fields || []).forEach(f => lines.push(`  - ${f.name}: ${f.type}`));
+    } else if (t === 'vector') {
+      lines.push(`Collection: ${s.collection}, Dimensions: ${s.dimensions}, Distance: ${s.distance}`);
+      lines.push('Payload:');
+      (s.payload || []).forEach(p => lines.push(`  - ${p.name}: ${p.type}`));
+    } else if (t === 'queue') {
+      lines.push(`Topic: ${s.topic}, Partitions: ${s.partitions}, Replication: ${s.replication}, Retention: ${s.retention}`);
+      lines.push('Message Schema:');
+      (s.schema || []).forEach(f => lines.push(`  - ${f.name}: ${f.type}${f.required ? ' [required]' : ''}`));
+    } else if (t === 'keyvalue') {
+      lines.push(`Table: ${s.table}, Billing: ${s.billingMode}`);
+      lines.push(`Partition Key: ${s.partitionKey?.name} (${s.partitionKey?.type})`);
+      if (s.sortKey?.name) lines.push(`Sort Key: ${s.sortKey.name} (${s.sortKey.type})`);
+      (s.attributes || []).forEach(a => lines.push(`  - ${a.name}: ${a.type}`));
+    } else if (t === 'column') {
+      lines.push(`Keyspace: ${s.keyspace}, Table: ${s.table}`);
+      (s.columns || []).forEach(c => lines.push(`  - ${c.name}: ${c.type} [${c.role}]`));
+    } else if (t === 'search') {
+      lines.push(`Index: ${s.index}, Shards: ${s.shards}, Replicas: ${s.replicas}`);
+      (s.fields || []).forEach(f => lines.push(`  - ${f.name}: ${f.type}${f.analyzer ? ` analyzer=${f.analyzer}` : ''}`));
+    } else if (t === 'tseries') {
+      lines.push(`Measurement: ${s.measurement}, Retention: ${s.retention}`);
+      lines.push(`Tags: ${(s.tags||[]).map(t=>t.name).join(', ')}`);
+      (s.fields || []).forEach(f => lines.push(`  - ${f.name}: ${f.type}`));
+    }
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
 const EXPORT_TABS = [
-  { id: 'sql', l: 'SQL DDL', gen: genSQL },
-  { id: 'prisma', l: 'Prisma', gen: genPrisma },
-  { id: 'typescript', l: 'TypeScript', gen: genTypeScript },
-  { id: 'go', l: 'Go Struct', gen: genGo },
+  { id: 'sql', l: 'SQL DDL', gen: (nodes) => genSQL(nodes) },
+  { id: 'prisma', l: 'Prisma', gen: (nodes) => genPrisma(nodes) },
+  { id: 'typescript', l: 'TypeScript', gen: (nodes) => genTypeScript(nodes) },
+  { id: 'go', l: 'Go Struct', gen: (nodes) => genGo(nodes) },
+  { id: 'ai', l: '✦ AI Export', gen: (nodes) => genAI(nodes) },
+  { id: 'json', l: '{ } JSON', gen: null }, // handled separately
 ];
 
 export function Modals({ state }) {
   const { showExport, showLinter, showShortcuts, showTemplates, exportTab, rfNodes, rfEdges } = state;
   return (
     <>
-      {showExport && <ExportModal nodes={rfNodes} tab={exportTab} />}
+      {showExport && <ExportModal nodes={rfNodes} edges={rfEdges} tab={exportTab} />}
       {showLinter && <LinterModal nodes={rfNodes} edges={rfEdges} />}
       {showShortcuts && <ShortcutsModal />}
       {showTemplates && <TemplatesModal />}
@@ -125,20 +192,64 @@ function ModalShell({ title, icon, onClose, width = 680, children }) {
   );
 }
 
-function ExportModal({ nodes, tab }) {
+function ExportModal({ nodes, edges, tab }) {
   const [copied, setCopied] = useState(false);
+  const [importErr, setImportErr] = useState('');
+  const fileRef = useRef();
+  const isJson = tab === 'json';
   const tabDef = EXPORT_TABS.find(t => t.id === tab) || EXPORT_TABS[0];
-  const code = tabDef.gen(nodes);
-  const copy = () => { navigator.clipboard?.writeText(code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); };
+  const code = isJson
+    ? JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, type: n.type, position: n.position, data: n.data })), edges }, null, 2)
+    : tabDef.gen(nodes);
+
+  const copy = () => navigator.clipboard?.writeText(code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+
+  const download = () => {
+    const blob = new Blob([code], { type: isJson ? 'application/json' : 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = isJson ? 'diagram.json' : `schema.${tab === 'sql' ? 'sql' : tab === 'prisma' ? 'prisma' : tab === 'go' ? 'go' : 'txt'}`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const handleImport = e => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const { nodes: n, edges: eg } = JSON.parse(ev.target.result);
+        if (!Array.isArray(n)) throw new Error('Invalid format: missing nodes array');
+        importDiagram(n, eg || []);
+        setState({ showExport: false });
+      } catch (err) {
+        setImportErr(err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   return (
-    <ModalShell title="Export Schema" icon={<Upload size={16} color="var(--brand)" />} onClose={() => setState({ showExport: false })}>
-      <div style={{ padding: '8px 18px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 2 }}>
+    <ModalShell title="Export / Import" icon={<Upload size={16} color="var(--brand)" />} onClose={() => setState({ showExport: false })}>
+      <div style={{ padding: '8px 18px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 2, alignItems: 'center' }}>
         {EXPORT_TABS.map(t => (
           <button key={t.id} onClick={() => setState({ exportTab: t.id })} style={{ background: 'none', border: 'none', color: tab === t.id ? 'var(--text-h)' : 'var(--muted)', padding: '6px 10px', fontSize: 11, borderBottom: `2px solid ${tab === t.id ? 'var(--brand)' : 'transparent'}`, cursor: 'pointer', fontWeight: tab === t.id ? 700 : 400 }}>{t.l}</button>
         ))}
+        <div style={{ flex: 1 }} />
+        {isJson && <>
+          <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
+          <button onClick={() => fileRef.current.click()} style={{ background: 'var(--field-bg)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Download size={12} /> Import JSON
+          </button>
+        </>}
       </div>
+      {importErr && <div style={{ margin: '8px 18px 0', background: '#FEF2F2', border: '1px solid #EF4444', borderRadius: 5, padding: '5px 10px', fontSize: 11, color: '#B91C1C' }}>{importErr}</div>}
       <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+          <button onClick={download} style={{ background: 'var(--field-bg)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Download size={13} /> Download
+          </button>
           <button onClick={copy} style={{ background: 'var(--field-bg)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
             {copied ? <><CheckCheck size={13} color="#10B981" /> Copied!</> : <><Copy size={13} /> Copy</>}
           </button>

@@ -1,8 +1,8 @@
 import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { Copy, Trash2, Key, Link, Search, Database, FileJson, GitBranch, Zap, Cloud, ScanSearch, TrendingUp, Sparkles, AlignJustify, MessageSquare, Hash, BookOpen } from 'lucide-react';
+import { Copy, Trash2, Key, Link, Search, Database, FileJson, GitBranch, Zap, Cloud, ScanSearch, TrendingUp, Sparkles, AlignJustify, MessageSquare, Hash, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import { DB } from '../constants';
-import { deleteNode, duplicateNode } from '../store';
+import { deleteNode, duplicateNode, updateNodeData } from '../store';
 
 // White Lucide icon per DB type
 const DB_ICONS = {
@@ -201,6 +201,7 @@ function NodeBody({ nodeId, data }) {
 export const DbNode = memo(({ id, data, selected }) => {
   const def = DB[data.dbType];
   const accent = data.color || def.c;
+  const collapsed = !!data.collapsed;
 
   return (
     <div
@@ -218,7 +219,7 @@ export const DbNode = memo(({ id, data, selected }) => {
       }}
     >
       {/* Header */}
-      <div style={{ padding: '12px 12px', display: 'flex', alignItems: 'center', gap: 9, borderBottom: '1px solid var(--node-border)', background: 'var(--field-bg)' }}>
+      <div style={{ padding: '12px 12px', display: 'flex', alignItems: 'center', gap: 9, borderBottom: collapsed ? 'none' : '1px solid var(--node-border)', background: 'var(--field-bg)' }}>
         <div style={{ width: 30, height: 30, borderRadius: 8, background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {DB_ICONS[data.dbType]}
         </div>
@@ -226,18 +227,27 @@ export const DbNode = memo(({ id, data, selected }) => {
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-h)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.name}</div>
           <div style={{ fontSize: 10.5, color: 'var(--text)', fontWeight: 600, marginTop: 1 }}>{def.l} · {data.engine}</div>
         </div>
-        {selected && (
-          <div style={{ display: 'flex', gap: 3 }}>
+        <div style={{ display: 'flex', gap: 3 }}>
+          <button
+            onClick={e => { e.stopPropagation(); updateNodeData(id, { collapsed: !collapsed }); }}
+            title={collapsed ? 'Expand' : 'Collapse'}
+            style={iconBtn(accent)}
+          >
+            {collapsed ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
+          </button>
+          {selected && <>
             <button onClick={e => { e.stopPropagation(); duplicateNode(id); }} title="Duplicate" style={iconBtn(accent)}><Copy size={11} /></button>
             <button onClick={e => { e.stopPropagation(); if (confirm('Delete?')) deleteNode(id); }} title="Delete" style={iconBtn('#EF4444')}><Trash2 size={11} /></button>
-          </div>
-        )}
+          </>}
+        </div>
       </div>
 
       {/* Body */}
-      <div style={{ overflow: 'hidden' }}>
-        <NodeBody nodeId={id} data={data} />
-      </div>
+      {!collapsed && (
+        <div style={{ overflow: 'hidden' }}>
+          <NodeBody nodeId={id} data={data} />
+        </div>
+      )}
     </div>
   );
 });

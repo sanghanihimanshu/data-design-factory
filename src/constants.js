@@ -17,9 +17,11 @@ export const SQL_TYPES = [
 // ── DOCUMENT ──────────────────────────────────────────
 export const BSON_T = [
   'ObjectId','String','Number','Int32','Int64','Double','Decimal128',
-  'Boolean','Date','Timestamp','BinData','Array','Object',
-  'Array<Object>','Array<String>','Array<Number>',
-  'Null','UUID','Regex','Mixed','Map',
+  'Boolean','Date','Timestamp','BinData',
+  'Object','Array','Array<Object>','Array<String>','Array<Number>',
+  'Array<ObjectId>','Array<Boolean>','Array<Date>','Array<Int32>',
+  'Array<Int64>','Array<Double>','Array<Decimal128>','Array<Mixed>',
+  'Null','UUID','Regex','Mixed','Map','Enum',
 ];
 
 // ── SEARCH ────────────────────────────────────────────
