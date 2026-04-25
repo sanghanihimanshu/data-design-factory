@@ -3,6 +3,7 @@ import { Handle, Position, useUpdateNodeInternals } from '@xyflow/react';
 import { Copy, Trash2, Key, Link, Search, Database, FileJson, GitBranch, Zap, Cloud, ScanSearch, TrendingUp, Sparkles, AlignJustify, MessageSquare, Hash, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import { DB } from '../constants';
 import { deleteNode, duplicateNode, updateNodeData } from '../store';
+import { getObjStoreSchemaView, getQueueSchemaView, getSearchSchemaView } from '../schemaCompat';
 
 // White Lucide icon per DB type
 const DB_ICONS = {
@@ -134,17 +135,27 @@ function NodeBody({ nodeId, data }) {
         {(schema.fields || []).map(f => <FieldRow key={f.id} nodeId={nodeId} rowId={f.id} name={f.name} type={f.type} color={c} />)}
       </>;
     case 'objstore':
-      return <>
-        <FieldRow nodeId={nodeId} rowId="obj-bucket" name="bucket" type={schema.bucket} color={c} />
-        <FieldRow nodeId={nodeId} rowId="obj-class" name="class" type={schema.storageClass} color={c} />
-        <FieldRow nodeId={nodeId} rowId="obj-enc" name="enc" type={schema.encryption} color={c} />
-      </>;
+      {
+        const obj = getObjStoreSchemaView(schema);
+        const bucketType = obj.bucket || (obj.buckets.length ? `${obj.buckets.length} buckets` : '—');
+        return <>
+          <FieldRow nodeId={nodeId} rowId="obj-bucket" name="bucket" type={bucketType} color={c} />
+          <FieldRow nodeId={nodeId} rowId="obj-class" name="class" type={obj.storageClass || 'STANDARD'} color={c} />
+          <FieldRow nodeId={nodeId} rowId="obj-enc" name="enc" type={obj.encryption || 'SSE-S3'} color={c} />
+        </>;
+      }
     case 'search':
-      return <>
-        <FieldRow nodeId={nodeId} rowId="search-index" name="index" type={schema.index} color={c} />
-        <FieldRow nodeId={nodeId} rowId="search-sr" name="shards/replicas" type={`${schema.shards}/${schema.replicas}`} color={c} />
-        {(schema.fields || []).map(f => <FieldRow key={f.id} nodeId={nodeId} rowId={f.id} name={f.name} type={f.type} color={c} indexIcon={f.indexed} />)}
-      </>;
+      {
+        const search = getSearchSchemaView(schema);
+        const indexType = search.index || (search.indices.length ? `${search.indices.length} indices` : '—');
+        const shards = Number.isFinite(search.shards) ? search.shards : 1;
+        const replicas = Number.isFinite(search.replicas) ? search.replicas : 0;
+        return <>
+          <FieldRow nodeId={nodeId} rowId="search-index" name="index" type={indexType} color={c} />
+          <FieldRow nodeId={nodeId} rowId="search-sr" name="shards/replicas" type={`${shards}/${replicas}`} color={c} />
+          {search.fields.map(f => <FieldRow key={f.id} nodeId={nodeId} rowId={f.id} name={f.name} type={f.type} color={c} indexIcon={f.indexed} />)}
+        </>;
+      }
     case 'tseries':
       return <>
         <FieldRow nodeId={nodeId} rowId="ts-measurement" name="measurement" type={schema.measurement} color={c} />
@@ -168,10 +179,17 @@ function NodeBody({ nodeId, data }) {
         ))}
       </>;
     case 'queue':
-      return <>
-        <FieldRow nodeId={nodeId} rowId="q-topic" name="topic" type={schema.topic} color={c} />
-        <FieldRow nodeId={nodeId} rowId="q-parts" name="partitions" type={`${schema.partitions}p · ${schema.replication}r`} color={c} />
-        {(schema.schema || []).flatMap((f) => {
+      {
+        const queue = getQueueSchemaView(schema);
+        const topicType = queue.topic || (queue.topics.length ? `${queue.topics.length} topics` : '—');
+        const hasScale = Number.isFinite(queue.partitions) || Number.isFinite(queue.replication);
+        const scaleType = hasScale
+          ? `${Number.isFinite(queue.partitions) ? queue.partitions : '—'}p · ${Number.isFinite(queue.replication) ? queue.replication : '—'}r`
+          : (queue.topics.length ? 'multi-topic' : '—');
+        return <>
+          <FieldRow nodeId={nodeId} rowId="q-topic" name="topic" type={topicType} color={c} />
+          <FieldRow nodeId={nodeId} rowId="q-parts" name="partitions" type={scaleType} color={c} />
+          {queue.msgSchema.flatMap((f) => {
           const rows = [
             <FieldRow key={f.id} nodeId={nodeId} rowId={f.id} name={f.name} type={f.type} color={c} required={f.required} subCount={f.subFields?.length || 0} />,
           ];
@@ -179,8 +197,9 @@ function NodeBody({ nodeId, data }) {
             rows.push(...nestedRows(f.subFields, nodeId, c, 1));
           }
           return rows;
-        })}
-      </>;
+          })}
+        </>;
+      }
     case 'keyvalue':
       return <>
         <FieldRow nodeId={nodeId} rowId="kv-table" name="table" type={schema.table} color={c} />

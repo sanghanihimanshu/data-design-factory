@@ -3,6 +3,7 @@ import { X, Copy, CheckCheck, AlertTriangle, Info, CheckCircle2, Keyboard, Layou
 import { DB } from '../constants';
 import { setState, importDiagram } from '../store';
 import { TEMPLATES, loadTemplate as loadTpl } from '../templates';
+import { getQueueSchemaView, getSearchSchemaView } from '../schemaCompat';
 
 // ── EXPORT ────────────────────────────────────────────
 function genSQL(nodes) {
@@ -32,7 +33,10 @@ function genTypeScript(nodes) {
     let fields = [];
     if (n.data.dbType === 'sql') fields = (s.columns||[]).map(c => ({ name: c.name, type: tsMap[c.type]||'unknown', opt: c.nullable&&!c.pk }));
     else if (n.data.dbType === 'document') fields = (s.fields||[]).map(f => ({ name: f.name, type: tsMap[f.type]||'unknown', opt: !f.required }));
-    else if (n.data.dbType === 'queue') fields = (s.schema||[]).map(f => ({ name: f.name, type: tsMap[f.type]||'unknown', opt: !f.required }));
+    else if (n.data.dbType === 'queue') {
+      const queue = getQueueSchemaView(s);
+      fields = queue.msgSchema.map(f => ({ name: f.name, type: tsMap[f.type]||'unknown', opt: !f.required }));
+    }
     const iName = n.data.name.charAt(0).toUpperCase() + n.data.name.slice(1);
     return `// ${def.l}: ${n.data.name}\nexport interface ${iName} {\n${fields.map(f=>`  ${f.name}${f.opt?'?':''}: ${f.type};`).join('\n')||'  [key: string]: unknown;'}\n}`;
   }).join('\n\n');
@@ -127,9 +131,13 @@ function genAI(nodes) {
       lines.push('Payload:');
       (s.payload || []).forEach(p => lines.push(`  - ${p.name}: ${p.type}`));
     } else if (t === 'queue') {
-      lines.push(`Topic: ${s.topic}, Partitions: ${s.partitions}, Replication: ${s.replication}, Retention: ${s.retention}`);
+      const queue = getQueueSchemaView(s);
+      const qTopic = queue.topic || (queue.topics.length ? `${queue.topics.length} topics` : '—');
+      const qPartitions = Number.isFinite(queue.partitions) ? queue.partitions : '—';
+      const qReplication = Number.isFinite(queue.replication) ? queue.replication : '—';
+      lines.push(`Topic: ${qTopic}, Partitions: ${qPartitions}, Replication: ${qReplication}, Retention: ${queue.retention || '—'}`);
       lines.push('Message Schema:');
-      (s.schema || []).forEach(f => lines.push(`  - ${f.name}: ${f.type}${f.required ? ' [required]' : ''}`));
+      queue.msgSchema.forEach(f => lines.push(`  - ${f.name}: ${f.type}${f.required ? ' [required]' : ''}`));
     } else if (t === 'keyvalue') {
       lines.push(`Table: ${s.table}, Billing: ${s.billingMode}`);
       lines.push(`Partition Key: ${s.partitionKey?.name} (${s.partitionKey?.type})`);
@@ -139,8 +147,12 @@ function genAI(nodes) {
       lines.push(`Keyspace: ${s.keyspace}, Table: ${s.table}`);
       (s.columns || []).forEach(c => lines.push(`  - ${c.name}: ${c.type} [${c.role}]`));
     } else if (t === 'search') {
-      lines.push(`Index: ${s.index}, Shards: ${s.shards}, Replicas: ${s.replicas}`);
-      (s.fields || []).forEach(f => lines.push(`  - ${f.name}: ${f.type}${f.analyzer ? ` analyzer=${f.analyzer}` : ''}`));
+      const search = getSearchSchemaView(s);
+      const sIndex = search.index || (search.indices.length ? `${search.indices.length} indices` : '—');
+      const sShards = Number.isFinite(search.shards) ? search.shards : 1;
+      const sReplicas = Number.isFinite(search.replicas) ? search.replicas : 0;
+      lines.push(`Index: ${sIndex}, Shards: ${sShards}, Replicas: ${sReplicas}`);
+      search.fields.forEach(f => lines.push(`  - ${f.name}: ${f.type}${f.analyzer ? ` analyzer=${f.analyzer}` : ''}`));
     } else if (t === 'tseries') {
       lines.push(`Measurement: ${s.measurement}, Retention: ${s.retention}`);
       lines.push(`Tags: ${(s.tags||[]).map(t=>t.name).join(', ')}`);

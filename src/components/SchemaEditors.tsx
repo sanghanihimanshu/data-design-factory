@@ -11,6 +11,7 @@ import { uid, updateSchema } from '@/store';
 import { SQL_TYPES, BSON_T, ES_T, CASS_T, KV_T, DB } from '@/constants';
 import { SubFieldEditor, EnumEditor } from './SubFieldEditor';
 import { useDragReorder } from '@/useDragReorder';
+import { getObjStoreSchemaView, getQueueSchemaView, getSearchSchemaView } from '@/schemaCompat';
 import type { Node } from '@xyflow/react';
 
 // ── Types ─────────────────────────────────────────────
@@ -461,6 +462,7 @@ export function CacheEditor({ n }: EditorProps) {
 /** Schema editor for object-storage (S3-style) nodes. */
 export function ObjStoreEditor({ n }: EditorProps) {
   const s = n.data.schema as Record<string, unknown>;
+  const view = getObjStoreSchemaView(s);
   const u = (p: Record<string, unknown>) => updateSchema(n.id, p);
 
   return (
@@ -474,19 +476,24 @@ export function ObjStoreEditor({ n }: EditorProps) {
         </div>
       </div>
       <div className="irow">
-        <div style={{ flex: 1 }}><span className="lbl">Bucket</span><input className="inp" value={(s.bucket as string) || ''} onChange={e => u({ bucket: e.target.value })} /></div>
-        <div style={{ flex: 1 }}><span className="lbl">Key Prefix</span><input className="inp" value={(s.prefix as string) || ''} onChange={e => u({ prefix: e.target.value })} /></div>
+        <div style={{ flex: 1 }}><span className="lbl">Bucket</span><input className="inp" value={view.bucket} onChange={e => u({ bucket: e.target.value })} /></div>
+        <div style={{ flex: 1 }}><span className="lbl">Key Prefix</span><input className="inp" value={view.prefix} onChange={e => u({ prefix: e.target.value })} /></div>
       </div>
+      {view.buckets.length > 1 && (
+        <div className="lbl" style={{ marginBottom: 6, color: 'var(--muted)' }}>
+          Legacy object-store schema detected ({view.buckets.length} buckets). Editing here updates primary bucket fields.
+        </div>
+      )}
       <div className="irow">
         <div style={{ flex: 1 }}>
           <span className="lbl">Storage Class</span>
-          <select className="inp" value={(s.storageClass as string) || 'STANDARD'} onChange={e => u({ storageClass: e.target.value })}>
+          <select className="inp" value={view.storageClass || 'STANDARD'} onChange={e => u({ storageClass: e.target.value })}>
             {['STANDARD', 'INTELLIGENT_TIERING', 'STANDARD_IA', 'ONEZONE_IA', 'GLACIER', 'GLACIER_IR', 'DEEP_ARCHIVE', 'REDUCED_REDUNDANCY'].map(t => <option key={t}>{t}</option>)}
           </select>
         </div>
         <div style={{ flex: 1 }}>
           <span className="lbl">ACL</span>
-          <select className="inp" value={(s.acl as string) || 'private'} onChange={e => u({ acl: e.target.value })}>
+          <select className="inp" value={view.acl || 'private'} onChange={e => u({ acl: e.target.value })}>
             {['private', 'public-read', 'public-read-write', 'authenticated-read', 'bucket-owner-read', 'bucket-owner-full-control'].map(t => <option key={t}>{t}</option>)}
           </select>
         </div>
@@ -494,7 +501,7 @@ export function ObjStoreEditor({ n }: EditorProps) {
       <div className="irow">
         <div style={{ flex: 1 }}>
           <span className="lbl">Encryption</span>
-          <select className="inp" value={(s.encryption as string) || 'SSE-S3'} onChange={e => u({ encryption: e.target.value })}>
+          <select className="inp" value={view.encryption || 'SSE-S3'} onChange={e => u({ encryption: e.target.value })}>
             {['SSE-S3', 'SSE-KMS', 'SSE-C', 'DSSE-KMS', 'None'].map(t => <option key={t}>{t}</option>)}
           </select>
         </div>
@@ -502,10 +509,10 @@ export function ObjStoreEditor({ n }: EditorProps) {
       </div>
       <div style={{ marginBottom: 8 }}>
         <span className="lbl">Lifecycle Rule</span>
-        <input className="inp" value={(s.lifecycle as string) || ''} placeholder="transition to GLACIER after 90d" onChange={e => u({ lifecycle: e.target.value })} style={{ fontSize: 10 }} />
+        <input className="inp" value={view.lifecycle} placeholder="transition to GLACIER after 90d" onChange={e => u({ lifecycle: e.target.value })} style={{ fontSize: 10 }} />
       </div>
       <div className="cb-row">
-        <label className="cb-lbl"><input type="checkbox" checked={!!s.versioning} onChange={e => u({ versioning: e.target.checked })} /><span style={{ color: s.versioning ? '#06B6D4' : 'var(--muted)' }}>Versioning</span></label>
+        <label className="cb-lbl"><input type="checkbox" checked={view.versioning} onChange={e => u({ versioning: e.target.checked })} /><span style={{ color: view.versioning ? '#06B6D4' : 'var(--muted)' }}>Versioning</span></label>
         <label className="cb-lbl"><input type="checkbox" checked={!!s.cors} onChange={e => u({ cors: e.target.checked })} /><span style={{ color: s.cors ? '#3B82F6' : 'var(--muted)' }}>CORS</span></label>
         <label className="cb-lbl"><input type="checkbox" checked={!!s.replication} onChange={e => u({ replication: e.target.checked })} /><span style={{ color: s.replication ? '#8B5CF6' : 'var(--muted)' }}>Replication</span></label>
         <label className="cb-lbl"><input type="checkbox" checked={!!s.publicAccess} onChange={e => u({ publicAccess: e.target.checked })} /><span style={{ color: s.publicAccess ? '#EF4444' : 'var(--muted)' }}>Public</span></label>
@@ -519,7 +526,8 @@ export function ObjStoreEditor({ n }: EditorProps) {
 /** Schema editor for full-text search (Elasticsearch-style) nodes. */
 export function SearchEditor({ n }: EditorProps) {
   const s = n.data.schema as Record<string, unknown>;
-  const fields = (s.fields as Array<Record<string, unknown>>) ?? [];
+  const view = getSearchSchemaView(s);
+  const fields = view.fields as Array<Record<string, unknown>>;
   const u = (p: Record<string, unknown>) => updateSchema(n.id, p);
   const def = DB[n.data.dbType];
   const dragProps = useDragReorder((from, to) => u({ fields: reorder(fields, from, to) }));
@@ -536,10 +544,15 @@ export function SearchEditor({ n }: EditorProps) {
         </div>
       </div>
       <div className="irow">
-        <div style={{ flex: 2 }}><span className="lbl">Index</span><input className="inp" value={(s.index as string) || ''} onChange={e => u({ index: e.target.value })} /></div>
-        <div style={{ width: 50, flexShrink: 0 }}><span className="lbl">Shards</span><input className="inp" type="number" value={(s.shards as number) || 1} onChange={e => u({ shards: Number(e.target.value) })} /></div>
-        <div style={{ width: 50, flexShrink: 0 }}><span className="lbl">Repls</span><input className="inp" type="number" value={(s.replicas as number) ?? 0} onChange={e => u({ replicas: Number(e.target.value) })} /></div>
+        <div style={{ flex: 2 }}><span className="lbl">Index</span><input className="inp" value={view.index} onChange={e => u({ index: e.target.value })} /></div>
+        <div style={{ width: 50, flexShrink: 0 }}><span className="lbl">Shards</span><input className="inp" type="number" value={Number.isFinite(view.shards) ? view.shards : 1} onChange={e => u({ shards: Number(e.target.value) })} /></div>
+        <div style={{ width: 50, flexShrink: 0 }}><span className="lbl">Repls</span><input className="inp" type="number" value={Number.isFinite(view.replicas) ? view.replicas : 0} onChange={e => u({ replicas: Number(e.target.value) })} /></div>
       </div>
+      {view.indices.length > 1 && (
+        <div className="lbl" style={{ marginBottom: 6, color: 'var(--muted)' }}>
+          Legacy search schema detected ({view.indices.length} indices). Editing here updates primary index fields.
+        </div>
+      )}
       <div className="irow">
         <div style={{ flex: 1 }}><span className="lbl">Refresh Interval</span><input className="inp" value={(s.refreshInterval as string) || '1s'} onChange={e => u({ refreshInterval: e.target.value })} /></div>
         <div style={{ flex: 1 }}><span className="lbl">Default Analyzer</span><input className="inp" value={(s.defaultAnalyzer as string) || 'standard'} onChange={e => u({ defaultAnalyzer: e.target.value })} /></div>
@@ -796,7 +809,8 @@ export function ColumnEditor({ n }: EditorProps) {
 /** Schema editor for message-queue (Kafka-style) nodes. */
 export function QueueEditor({ n }: EditorProps) {
   const s = n.data.schema as Record<string, unknown>;
-  const schema = (s.schema as Array<Record<string, unknown>>) ?? [];
+  const view = getQueueSchemaView(s);
+  const schema = view.msgSchema as Array<Record<string, unknown>>;
   const u = (p: Record<string, unknown>) => updateSchema(n.id, p);
   const dragProps = useDragReorder((from, to) => u({ schema: reorder(schema, from, to) }));
   const { collapsed, toggle } = useCollapse(schema.map(f => f.id as string));
@@ -811,12 +825,17 @@ export function QueueEditor({ n }: EditorProps) {
           </select>
         </div>
       </div>
-      <div style={{ marginBottom: 8 }}><span className="lbl">Topic</span><input className="inp" value={(s.topic as string) || ''} onChange={e => u({ topic: e.target.value })} /></div>
+      <div style={{ marginBottom: 8 }}><span className="lbl">Topic</span><input className="inp" value={view.topic} onChange={e => u({ topic: e.target.value })} /></div>
       <div className="irow">
-        <div style={{ flex: 1 }}><span className="lbl">Partitions</span><input className="inp" type="number" value={(s.partitions as number) || 3} onChange={e => u({ partitions: Number(e.target.value) })} /></div>
-        <div style={{ flex: 1 }}><span className="lbl">Replication</span><input className="inp" type="number" value={(s.replication as number) || 1} onChange={e => u({ replication: Number(e.target.value) })} /></div>
-        <div style={{ flex: 1 }}><span className="lbl">Retention</span><input className="inp" value={(s.retention as string) || '7d'} onChange={e => u({ retention: e.target.value })} /></div>
+        <div style={{ flex: 1 }}><span className="lbl">Partitions</span><input className="inp" type="number" value={Number.isFinite(view.partitions) ? view.partitions : 3} onChange={e => u({ partitions: Number(e.target.value) })} /></div>
+        <div style={{ flex: 1 }}><span className="lbl">Replication</span><input className="inp" type="number" value={Number.isFinite(view.replication) ? view.replication : 1} onChange={e => u({ replication: Number(e.target.value) })} /></div>
+        <div style={{ flex: 1 }}><span className="lbl">Retention</span><input className="inp" value={view.retention || '7d'} onChange={e => u({ retention: e.target.value })} /></div>
       </div>
+      {view.topics.length > 1 && (
+        <div className="lbl" style={{ marginBottom: 6, color: 'var(--muted)' }}>
+          Legacy queue schema detected ({view.topics.length} topics). Editing here updates primary topic fields.
+        </div>
+      )}
       <div className="irow">
         <div style={{ flex: 1 }}>
           <span className="lbl">Compression</span>
