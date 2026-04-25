@@ -330,21 +330,29 @@ function ShortcutsModal() {
 
 function TemplatesModal() {
   return (
-    <ModalShell title="Templates" icon={<LayoutTemplate size={16} />} onClose={() => setState({ showTemplates: false })} width={500}>
+    <ModalShell title="Templates" icon={<LayoutTemplate size={16} />} onClose={() => setState({ showTemplates: false })} width={560}>
       <div style={{ padding: 18 }}>
-        {Object.entries(TEMPLATES).map(([name, tpl]) => (
-          <div key={name} onClick={() => loadTpl(tpl)}
-            style={{ background: 'var(--field-bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 14, marginBottom: 10, cursor: 'pointer', transition: 'border-color .15s' }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand)'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-          >
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-h)', marginBottom: 4 }}>{name}</div>
-            <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 8 }}>{tpl.length} nodes</div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {tpl.map((n, i) => <span key={i} style={{ fontSize: 9, color: DB[n.data?.dbType||n.type]?.c||'#64748B', background: (DB[n.data?.dbType||n.type]?.c||'#64748B')+'18', padding: '1px 6px', borderRadius: 3 }}>{DB[n.data?.dbType||n.type]?.i} {n.data?.name||n.name}</span>)}
+        {Object.entries(TEMPLATES).map(([name, tpl]) => {
+          const nodes = tpl.nodes || tpl;
+          const edgeCount = tpl.edges?.length || 0;
+          return (
+            <div key={name} onClick={() => loadTpl(tpl)}
+              style={{ background: 'var(--field-bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 14, marginBottom: 10, cursor: 'pointer', transition: 'border-color .15s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+            >
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-h)', marginBottom: 3 }}>{name}</div>
+              <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 10 }}>{nodes.length} nodes · {edgeCount} connections</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {nodes.map((n, i) => {
+                  const dbType = n.data?.dbType || n.type;
+                  const c = DB[dbType]?.c || '#64748B';
+                  return <span key={i} style={{ fontSize: 9, color: c, background: c + '18', padding: '1px 6px', borderRadius: 3 }}>{DB[dbType]?.i} {n.data?.name || n.name}</span>;
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </ModalShell>
   );

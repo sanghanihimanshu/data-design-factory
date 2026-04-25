@@ -3,8 +3,10 @@ import { snapshot, schedSave, setState } from './store';
 
 function commitNodes(rf, nextNodes) {
   snapshot();
-  rf.setNodes(nextNodes);
+  // Update _state.rfNodes BEFORE rf.setNodes so that when onNodesChange fires
+  // and calls applyNodeChanges(changes, s.rfNodes), it reads the already-updated positions.
   setState({ rfNodes: nextNodes });
+  rf.setNodes(nextNodes);
   schedSave();
 }
 
@@ -149,8 +151,10 @@ export function autoLayoutByDepth(rf) {
         queue.push(id);
       });
 
+      const inQueue = new Set(seed);
       while (queue.length) {
         const cur = queue.shift();
+        inQueue.delete(cur);
         const d = depth.get(cur) || 0;
         const nextNodes = outgoing.get(cur) || [];
         nextNodes.forEach((nxt) => {
@@ -158,7 +162,10 @@ export function autoLayoutByDepth(rf) {
           const nextDepth = d + 1;
           if (!depth.has(nxt) || (depth.get(nxt) || 0) < nextDepth) {
             depth.set(nxt, nextDepth);
-            queue.push(nxt);
+            if (!inQueue.has(nxt)) {
+              inQueue.add(nxt);
+              queue.push(nxt);
+            }
           }
         });
       }

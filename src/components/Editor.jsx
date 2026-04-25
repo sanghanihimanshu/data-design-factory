@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import {
   ReactFlow, Background, Controls, MiniMap, Panel,
   useNodesState, useEdgesState,
@@ -164,7 +164,7 @@ export function Editor({ state }) {
   const isDark = theme === 'dark';
 
   return (
-    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative', willChange: 'transform' }}>
       <EdgeMarkers />
       <ReactFlow
         nodes={nodes} edges={edges}
@@ -229,7 +229,7 @@ export function Editor({ state }) {
   );
 }
 
-function ConnTypeBar({ pendingConnType }) {
+const ConnTypeBar = memo(function ConnTypeBar({ pendingConnType }) {
   return (
     <div style={{ background: 'var(--panel-bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '5px 8px', display: 'flex', gap: 3, flexWrap: 'wrap', maxWidth: 640, boxShadow: '0 4px 20px rgba(0,0,0,.1)', backdropFilter: 'blur(8px)' }}>
       {CONN_TYPES.map(ct => (
@@ -240,4 +240,4 @@ function ConnTypeBar({ pendingConnType }) {
       ))}
     </div>
   );
-}
+});

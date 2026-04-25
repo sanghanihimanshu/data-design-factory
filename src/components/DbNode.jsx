@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { memo, useEffect } from 'react';
+import { Handle, Position, useUpdateNodeInternals } from '@xyflow/react';
 import { Copy, Trash2, Key, Link, Search, Database, FileJson, GitBranch, Zap, Cloud, ScanSearch, TrendingUp, Sparkles, AlignJustify, MessageSquare, Hash, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import { DB } from '../constants';
 import { deleteNode, duplicateNode, updateNodeData } from '../store';
@@ -202,6 +202,9 @@ export const DbNode = memo(({ id, data, selected }) => {
   const def = DB[data.dbType];
   const accent = data.color || def.c;
   const collapsed = !!data.collapsed;
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  useEffect(() => { updateNodeInternals(id); }, [id, data, updateNodeInternals]);
 
   return (
     <div
@@ -215,7 +218,7 @@ export const DbNode = memo(({ id, data, selected }) => {
           : '0 4px 14px rgba(8,15,30,.08)',
         transition: 'border-color .12s, box-shadow .12s',
         fontFamily: 'var(--sans)',
-        overflow: 'hidden',
+        overflow: 'visible',
       }}
     >
       {/* Header */}
@@ -225,7 +228,10 @@ export const DbNode = memo(({ id, data, selected }) => {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-h)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.name}</div>
-          <div style={{ fontSize: 10.5, color: 'var(--text)', fontWeight: 600, marginTop: 1 }}>{def.l} · {data.engine}</div>
+          <div style={{ fontSize: 10.5, color: 'var(--text)', fontWeight: 600, marginTop: 1 }}>
+            {def.l} · {data.engine}
+            {data.alias && <span style={{ marginLeft: 5, color: accent, fontFamily: 'var(--mono)', fontSize: 9.5 }}>@{data.alias}</span>}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 3 }}>
           <button
@@ -266,6 +272,6 @@ const rowHandleStyle = (color, side) => ({
   background: color,
   border: '1.5px solid var(--node-bg)',
   [side]: -5,
-  top: '50%',
-  transform: 'translateY(-50%)',
+  top: 'calc(50% - 5px)',
+  transform: 'none',
 });

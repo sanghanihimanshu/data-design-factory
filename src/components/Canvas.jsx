@@ -142,21 +142,21 @@ export function Canvas({ state, onNodeMouseDown, cvRef }) {
       </svg>
 
       {/* groups layer */}
-      <div style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '0 0', transform: `translate(${vp.x}px,${vp.y}px) scale(${vp.s})`, zIndex: 1 }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '0 0', transform: `translate(${vp.x}px,${vp.y}px) scale(${vp.s})`, zIndex: 1, willChange: 'transform' }}>
         {groups.map(g => (
           <GroupEl key={g.id} g={g} selId={selId} vp={vp} />
         ))}
       </div>
 
       {/* nodes layer */}
-      <div style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '0 0', transform: `translate(${vp.x}px,${vp.y}px) scale(${vp.s})`, zIndex: 3 }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '0 0', transform: `translate(${vp.x}px,${vp.y}px) scale(${vp.s})`, zIndex: 3, willChange: 'transform' }}>
         {visNodes.map(n => (
           <NodeEl key={n.id} n={n} selId={selId} linking={linking} pendingConnType={pendingConnType} onMouseDown={onNodeMouseDown} />
         ))}
       </div>
 
       {/* notes layer */}
-      <div style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '0 0', transform: `translate(${vp.x}px,${vp.y}px) scale(${vp.s})`, zIndex: 4 }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '0 0', transform: `translate(${vp.x}px,${vp.y}px) scale(${vp.s})`, zIndex: 4, willChange: 'transform' }}>
         {notes.map(n => <NoteEl key={n.id} n={n} selId={selId} />)}
       </div>
 
