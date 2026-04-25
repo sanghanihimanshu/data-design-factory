@@ -237,7 +237,7 @@ export const DbNode = memo(({ id, data, selected }) => {
           : '0 4px 14px rgba(8,15,30,.08)',
         transition: 'border-color .12s, box-shadow .12s',
         fontFamily: 'var(--sans)',
-        overflow: 'visible',
+        overflow: 'hidden',
       }}
     >
       {/* Header */}
